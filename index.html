@@ -1,0 +1,279 @@
+<!doctype html>
+<html lang="bn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Solar Monitor</title>
+<script src="https://cdn.jsdelivr.net/npm/mqtt@5.10.1/dist/mqtt.min.js"></script>
+<style>
+:root{--bg:#070b14;--glass:rgba(255,255,255,.05);--glass2:rgba(255,255,255,.09);--border:rgba(255,255,255,.1);--text:#f1f5f9;--mute:#8b9bb4;--a1:#fbbf24;--a2:#f97316;--green:#34d399;--red:#f87171}
+@media (prefers-color-scheme:light){:root:not([data-theme=dark]){--bg:#eef2f8;--glass:rgba(255,255,255,.8);--glass2:#fff;--border:rgba(15,23,42,.1);--text:#0f172a;--mute:#5b6b83}}
+:root[data-theme=light]{--bg:#eef2f8;--glass:rgba(255,255,255,.8);--glass2:#fff;--border:rgba(15,23,42,.1);--text:#0f172a;--mute:#5b6b83}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;min-height:100vh;color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI","Noto Sans Bengali",Roboto,sans-serif;
+background:radial-gradient(600px 300px at 85% -5%,color-mix(in srgb,var(--a1) 22%,transparent),transparent 60%),radial-gradient(500px 300px at -5% 10%,rgba(56,189,248,.12),transparent 60%),var(--bg);background-attachment:fixed}
+.wrap{max-width:820px;margin:auto;padding:20px 16px 40px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:16px}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:linear-gradient(135deg,var(--a1),var(--a2))}
+.logo svg{width:22px;height:22px;fill:#fff}
+h1{font-size:20px;margin:0}.sub{font-size:12px;color:var(--mute)}
+.ib{width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--glass);color:var(--text);cursor:pointer;font-size:17px}
+.status{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.pill{display:inline-flex;align-items:center;gap:7px;font-size:12px;padding:6px 12px;border-radius:99px;background:var(--glass);border:1px solid var(--border)}
+.dot{width:8px;height:8px;border-radius:50%;background:#64748b}.dot.ok{background:var(--green);box-shadow:0 0 0 4px rgba(52,211,153,.18)}.dot.bad{background:var(--red)}
+.glass{background:var(--glass);border:1px solid var(--border);border-radius:20px;backdrop-filter:blur(14px)}
+.hero{padding:18px;margin-bottom:12px}
+.tabs{display:flex;gap:6px;margin-bottom:8px}
+.tab{flex:1;padding:8px;border-radius:10px;border:1px solid var(--border);background:transparent;color:var(--mute);font-weight:600;cursor:pointer}
+.tab.on{color:#1a1205;background:linear-gradient(135deg,var(--a1),var(--a2));border-color:transparent}
+.big{font-size:clamp(38px,11vw,56px);font-weight:800;letter-spacing:-1.5px;line-height:1.1;background:linear-gradient(90deg,var(--a1),var(--a2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.big small{font-size:.38em;font-weight:600;-webkit-text-fill-color:var(--mute);margin-left:4px}
+canvas{width:100%;height:130px;display:block;margin-top:8px}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.m{padding:13px}.lbl{font-size:12px;color:var(--mute)}.num{font-size:21px;font-weight:700;margin-top:6px}.num small{font-size:12px;color:var(--mute);margin-left:2px}
+.link{background:none;border:0;color:var(--mute);font-size:11px;padding:0;margin-top:4px;cursor:pointer;text-decoration:underline}
+h2{font-size:15px;margin:0 0 10px 2px;color:var(--mute);font-weight:600}
+.relays{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.tile{padding:14px;transition:.25s}
+.tile.on{border-color:rgba(52,211,153,.5);background:linear-gradient(160deg,rgba(52,211,153,.16),var(--glass))}
+.head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.bulb{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--glass2)}
+.bulb svg{width:19px;height:19px;stroke:var(--mute);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.tile.on .bulb{background:linear-gradient(135deg,#34d399,#10b981)}.tile.on .bulb svg{stroke:#fff}
+.ctl{display:flex;align-items:center;gap:8px}
+.clk{width:34px;height:34px;border-radius:10px;border:1px solid var(--border);background:var(--glass2);color:var(--text);cursor:pointer}
+.sw{position:relative;width:52px;height:30px;border-radius:99px;border:0;cursor:pointer;background:#475569;transition:.25s;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;transition:.25s}
+.sw[aria-checked=true]{background:var(--green)}.sw[aria-checked=true]::after{transform:translateX(22px)}
+.name{font-weight:600;font-size:15px;cursor:pointer}.name i{font-style:normal;color:var(--mute);font-size:12px}
+.state{font-size:12px;color:var(--mute);margin-top:2px}.tile.on .state{color:var(--green)}
+.inf{font-size:11px;color:var(--a1);margin-top:5px;min-height:14px}
+#msg{min-height:20px;margin-top:14px;font-size:13px;color:var(--a1);text-align:center}
+.panel{display:none;padding:16px;margin-bottom:14px}.panel.open{display:block}
+label{display:block;font-size:12px;color:var(--mute);margin:10px 0 4px}
+input{width:100%;padding:11px 12px;border-radius:12px;border:1px solid var(--border);background:var(--glass2);color:var(--text);font-size:14px;outline:none}
+.btn{padding:11px 14px;border:0;border-radius:12px;font-weight:700;font-size:14px;cursor:pointer;color:#1a1205;background:linear-gradient(135deg,var(--a1),var(--a2))}
+.btn.full{width:100%;margin-top:14px}.btn.ghost{background:var(--glass2);color:var(--text);border:1px solid var(--border)}
+.note{font-size:12px;color:var(--mute);margin-top:12px;line-height:1.5}
+.sw-row{display:flex;gap:10px;margin-top:6px}
+.sw-c{width:34px;height:34px;border-radius:50%;border:2px solid transparent;cursor:pointer}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:flex-end;justify-content:center;z-index:20}
+.sheet.open{display:flex}
+.sin{width:100%;max-width:520px;background:var(--bg);border:1px solid var(--border);border-radius:22px 22px 0 0;padding:18px;max-height:88vh;overflow:auto}
+.sin h3{margin:0 0 6px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}
+.chip{padding:8px 12px;border-radius:99px;border:1px solid var(--border);background:var(--glass2);color:var(--text);cursor:pointer;font-size:13px}
+.chip.on{background:linear-gradient(135deg,var(--a1),var(--a2));color:#1a1205;border-color:transparent}
+.row{display:flex;gap:8px;align-items:center;margin-top:6px}
+.row input{flex:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<div class="top">
+  <div class="brand"><div class="logo"><svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6z"/></svg></div>
+  <div><h1>Solar Monitor</h1><div class="sub">ESP32 · লাইভ কন্ট্রোল</div></div></div>
+  <div style="display:flex;gap:8px"><button class="ib" id="themeBtn" aria-label="Theme">🌓</button><button class="ib" id="gear" aria-label="Settings">⚙️</button></div>
+</div>
+
+<div class="glass panel" id="cfg">
+  <label>রঙ</label><div class="sw-row" id="accs"></div>
+  <label>Broker URL (WebSocket Secure)</label>
+  <input id="url" value="wss://broker.hivemq.com:8884/mqtt">
+  <label>Topic base (ESP32 কোডের সাথে হুবহু মিলতে হবে)</label>
+  <input id="base" placeholder="solarmon/your-unique-id">
+  <label>Username (ঐচ্ছিক)</label><input id="user" autocomplete="off">
+  <label>Password (ঐচ্ছিক)</label><input id="pass" type="password" autocomplete="off">
+  <button class="btn full" id="save">Save &amp; Connect</button>
+  <div class="note">সেটিংস শুধু আপনার ব্রাউজারে সেভ হয়। পাবলিক ব্রোকারে টপিক জানলে যে কেউ রিলে চালাতে পারে — লম্বা র‍্যান্ডম টপিক বা username/password সহ ব্রোকার ব্যবহার করুন।</div>
+</div>
+
+<div class="status">
+  <span class="pill"><span class="dot" id="dBroker"></span><span id="tBroker">Broker: বিচ্ছিন্ন</span></span>
+  <span class="pill"><span class="dot" id="dDev"></span><span id="tDev">ESP32: অজানা</span></span>
+  <span class="pill" id="last">শেষ আপডেট: --</span>
+</div>
+
+<div class="glass hero">
+  <div class="tabs">
+    <button class="tab on" data-m="p">Power</button><button class="tab" data-m="v">Voltage</button><button class="tab" data-m="i">Current</button>
+  </div>
+  <div class="big"><span id="big">--</span><small id="unit">W</small></div>
+  <canvas id="chart" width="720" height="260"></canvas>
+</div>
+
+<div class="metrics">
+  <div class="glass m"><div class="lbl">Voltage</div><div class="num"><span id="v">--</span><small>V</small></div></div>
+  <div class="glass m"><div class="lbl">Current</div><div class="num"><span id="i">--</span><small>A</small></div></div>
+  <div class="glass m"><div class="lbl">Energy</div><div class="num"><span id="kwh">--</span><small>kWh</small></div><button class="link" id="rst">রিসেট</button></div>
+</div>
+
+<h2>লোড কন্ট্রোল</h2>
+<div id="relays" class="relays"></div>
+<div id="msg"></div>
+</div>
+
+<div class="sheet" id="sheet"><div class="sin">
+  <h3 id="shT">Load</h3>
+  <div class="lbl">⏱ টাইমার — এত মিনিট চালু থাকবে, তারপর নিজে বন্ধ হবে</div>
+  <div class="chips" id="pre"></div>
+  <div class="row"><input id="tmin" type="number" min="1" max="1440" placeholder="নিজের মিনিট"><button class="btn" id="tgo">Start</button><button class="btn ghost" id="tx">বাতিল</button></div>
+  <div class="lbl" style="margin-top:18px">🗓 শিডিউল — নির্দিষ্ট সময়ে নিজে চালু/বন্ধ</div>
+  <div class="row"><span class="lbl" style="flex:none">চালু</span><input id="son" type="time"><span class="lbl" style="flex:none">বন্ধ</span><input id="soff" type="time"></div>
+  <div class="chips" id="days"></div>
+  <div class="row"><span class="lbl" style="flex:1">শিডিউল চালু রাখুন</span><button class="sw" id="sen" role="switch" aria-checked="false"></button></div>
+  <div class="row" style="margin-top:14px"><button class="btn" style="flex:1" id="ssave">Save</button><button class="btn ghost" style="flex:1" id="sclose">বন্ধ করুন</button></div>
+  <div class="note">শিডিউল ESP32 এ সেভ থাকে, ওয়েবসাইট বন্ধ থাকলেও চলে। এজন্য ESP32 কে ইন্টারনেটে যুক্ত থাকতে হবে (সময় নেওয়ার জন্য)।</div>
+</div></div>
+
+<script>
+const $=id=>document.getElementById(id),root=document.documentElement;
+let client=null,base='',built=false,count=0,lastSeen=0,last=null,metric='p',curCh=0,schDays=127,schEn=0;
+const H={p:[],v:[],i:[]},states=[];
+const U={p:['W',1],v:['V',1],i:['A',3]};
+const ACC={amber:['#fbbf24','#f97316'],blue:['#38bdf8','#6366f1'],green:['#34d399','#10b981'],violet:['#a78bfa','#ec4899']};
+const DAYS=['র','সো','ম','বু','বৃ','শু','শ'];
+const BULB='<svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/></svg>';
+
+function ui(){try{return JSON.parse(localStorage.getItem('solar_ui')||'{}')}catch(e){return{}}}
+function setUi(k,v){const u=ui();u[k]=v;try{localStorage.setItem('solar_ui',JSON.stringify(u))}catch(e){}}
+function applyUi(){
+  const u=ui(),t=u.theme||'auto',a=ACC[u.acc]||ACC.amber;
+  root.dataset.theme=t;root.style.setProperty('--a1',a[0]);root.style.setProperty('--a2',a[1]);
+  $('themeBtn').textContent={auto:'🌓',dark:'🌙',light:'☀️'}[t];draw();
+}
+$('themeBtn').onclick=()=>{const o=['auto','dark','light'];setUi('theme',o[(o.indexOf(ui().theme||'auto')+1)%3]);applyUi();};
+Object.keys(ACC).forEach(k=>{
+  const b=document.createElement('button');b.className='sw-c';b.style.background='linear-gradient(135deg,'+ACC[k][0]+','+ACC[k][1]+')';
+  b.onclick=()=>{setUi('acc',k);applyUi();};$('accs').appendChild(b);
+});
+$('gear').onclick=()=>$('cfg').classList.toggle('open');
+
+function load(){try{const c=JSON.parse(localStorage.getItem('solar_cfg')||'{}');if(c.url)$('url').value=c.url;$('base').value=c.base||'';$('user').value=c.user||'';$('pass').value=c.pass||'';}catch(e){}}
+function save(){try{localStorage.setItem('solar_cfg',JSON.stringify({url:$('url').value,base:$('base').value,user:$('user').value,pass:$('pass').value}));}catch(e){}}
+function loadName(ch){try{const n=JSON.parse(localStorage.getItem('solar_names')||'{}');if(n[ch])return n[ch];}catch(e){}return 'Load '+(ch+1);}
+function setName(ch,v){try{const n=JSON.parse(localStorage.getItem('solar_names')||'{}');n[ch]=v;localStorage.setItem('solar_names',JSON.stringify(n));}catch(e){}}
+const pad=n=>String(n).padStart(2,'0'),hm=m=>pad(Math.floor(m/60))+':'+pad(m%60),fmt=s=>pad(Math.floor(s/60))+':'+pad(s%60);
+
+function send(p){
+  if(!client||!client.connected){$('msg').textContent='Broker এর সাথে যুক্ত নয়';return false;}
+  client.publish(base+'/cmd',p,{qos:0});$('msg').textContent='';return true;
+}
+
+function buildRelays(n){
+  if(built)return;built=true;count=n;
+  for(let ch=0;ch<n;ch++){
+    const d=document.createElement('div');d.className='glass tile';d.id='r'+ch;
+    d.innerHTML='<div class="head"><div class="bulb">'+BULB+'</div><div class="ctl"><button class="clk" aria-label="Timer">⏱</button>'+
+      '<button class="sw" id="t'+ch+'" role="switch" aria-checked="false" aria-label="Toggle"></button></div></div>'+
+      '<div class="name"><span>'+loadName(ch)+'</span> <i>✎</i></div><div class="state" id="s'+ch+'">বন্ধ · OFF</div><div class="inf" id="f'+ch+'"></div>';
+    d.querySelector('.name').onclick=()=>{const v=prompt('লোডের নাম:',loadName(ch));if(v&&v.trim()){setName(ch,v.trim());d.querySelector('.name span').textContent=v.trim();}};
+    d.querySelector('.sw').onclick=()=>send(ch+':'+(states[ch]?0:1));
+    d.querySelector('.clk').onclick=()=>openSheet(ch);
+    $('relays').appendChild(d);
+  }
+}
+
+function showStatus(s){
+  last=s;
+  H.p.push(+s.p);H.v.push(+s.v);H.i.push(+s.i);
+  for(const k in H)if(H[k].length>120)H[k].shift();
+  $('v').textContent=(+s.v).toFixed(1);$('i').textContent=(+s.i).toFixed(3);
+  $('kwh').textContent=((+s.e||0)/1000).toFixed(3);
+  buildRelays(+s.relays);
+  let anySch=false;
+  for(let ch=0;ch<count;ch++){
+    const on=((+s.mask>>ch)&1)!==0;states[ch]=on;
+    $('r'+ch).classList.toggle('on',on);
+    $('s'+ch).textContent=on?'চালু · ON':'বন্ধ · OFF';
+    $('t'+ch).setAttribute('aria-checked',on?'true':'false');
+    const tm=((s.tm||[])[ch])|0,sc=(s.sch||[])[ch];let f='';
+    if(tm>0)f+='⏱ '+fmt(tm)+' বাকি  ';
+    if(sc&&sc[0]){f+='🗓 '+hm(sc[1])+'–'+hm(sc[2]);anySch=true;}
+    $('f'+ch).textContent=f;
+  }
+  if(anySch&&s.ntp===0)$('msg').textContent='ESP32 তে সময় সিঙ্ক হয়নি — শিডিউল চলবে না (ইন্টারনেট দেখুন)';
+  lastSeen=Date.now();hero();draw();
+}
+function hero(){
+  const a=H[metric],u=U[metric];
+  $('big').textContent=a.length?a[a.length-1].toFixed(u[1]):'--';$('unit').textContent=u[0];
+}
+function draw(){
+  const c=$('chart'),g=c.getContext('2d'),W=c.width,Hh=c.height,a=H[metric];
+  g.clearRect(0,0,W,Hh);if(a.length<2)return;
+  const col=getComputedStyle(root).getPropertyValue('--a1').trim()||'#fbbf24';
+  const max=Math.max(metric==='i'?0.1:10,...a)*1.2,p=10;
+  const pts=a.map((y,x)=>[p+x*(W-2*p)/119,Hh-p-(y/max)*(Hh-2*p)]);
+  const gr=g.createLinearGradient(0,0,0,Hh);gr.addColorStop(0,col+'73');gr.addColorStop(1,col+'00');
+  g.beginPath();pts.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));
+  g.lineTo(pts[pts.length-1][0],Hh);g.lineTo(pts[0][0],Hh);g.closePath();g.fillStyle=gr;g.fill();
+  g.beginPath();pts.forEach((q,i)=>i?g.lineTo(q[0],q[1]):g.moveTo(q[0],q[1]));
+  g.strokeStyle=col;g.lineWidth=3.5;g.lineJoin='round';g.lineCap='round';g.stroke();
+  const l=pts[pts.length-1];g.beginPath();g.arc(l[0],l[1],6,0,7);g.fillStyle=col;g.fill();
+}
+document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{
+  metric=b.dataset.m;document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));hero();draw();
+});
+$('rst').onclick=()=>{if(confirm('Energy (kWh) শূন্য করবেন?'))send('reset');};
+
+/* ---- timer / schedule sheet ---- */
+[15,30,60,120].forEach(m=>{
+  const b=document.createElement('button');b.className='chip';b.textContent=m<60?m+' মিনিট':(m/60)+' ঘণ্টা';
+  b.onclick=()=>{if(send('timer:'+curCh+':'+m))closeSheet();};$('pre').appendChild(b);
+});
+DAYS.forEach((d,n)=>{
+  const b=document.createElement('button');b.className='chip';b.textContent=d;b.dataset.n=n;
+  b.onclick=()=>{schDays^=(1<<n);paintDays();};$('days').appendChild(b);
+});
+function paintDays(){document.querySelectorAll('#days .chip').forEach(b=>b.classList.toggle('on',(schDays>>b.dataset.n)&1));}
+function openSheet(ch){
+  curCh=ch;$('shT').textContent=loadName(ch);
+  const sc=last&&last.sch&&last.sch[ch]?last.sch[ch]:[0,360,1080,127];
+  schEn=sc[0];schDays=sc[3];$('son').value=hm(sc[1]);$('soff').value=hm(sc[2]);$('tmin').value='';
+  $('sen').setAttribute('aria-checked',schEn?'true':'false');paintDays();$('sheet').classList.add('open');
+}
+function closeSheet(){$('sheet').classList.remove('open');}
+$('sclose').onclick=closeSheet;
+$('sheet').onclick=e=>{if(e.target===$('sheet'))closeSheet();};
+$('sen').onclick=()=>{schEn=schEn?0:1;$('sen').setAttribute('aria-checked',schEn?'true':'false');};
+$('tgo').onclick=()=>{const m=parseInt($('tmin').value);if(m>0&&send('timer:'+curCh+':'+m))closeSheet();};
+$('tx').onclick=()=>{if(send('timer:'+curCh+':0'))closeSheet();};
+$('ssave').onclick=()=>{
+  const t=v=>{const p=(v||'').split(':');return p.length==2?(+p[0])*60+(+p[1]):-1;};
+  const on=t($('son').value),off=t($('soff').value);
+  if(on<0||off<0){alert('সময় দিন');return;}
+  if(send('sch:'+curCh+':'+schEn+':'+on+':'+off+':'+schDays))closeSheet();
+};
+
+function setBroker(ok,t){$('dBroker').className='dot '+(ok?'ok':'bad');$('tBroker').textContent='Broker: '+t;}
+function setDev(on){$('dDev').className='dot '+(on?'ok':'bad');$('tDev').textContent='ESP32: '+(on?'অনলাইন':'অফলাইন');}
+
+function connect(){
+  if(client){client.end(true);client=null;}
+  base=$('base').value.trim().replace(/\/$/,'');
+  if(!base){$('cfg').classList.add('open');$('msg').textContent='Topic base দিন';return;}
+  setBroker(false,'সংযোগ হচ্ছে...');
+  const o={reconnectPeriod:3000,connectTimeout:8000,clientId:'web-'+Math.random().toString(16).slice(2,10)};
+  if($('user').value){o.username=$('user').value;o.password=$('pass').value;}
+  try{client=mqtt.connect($('url').value.trim(),o);}catch(e){setBroker(false,'ভুল URL');return;}
+  client.on('connect',()=>{setBroker(true,'যুক্ত');$('msg').textContent='';client.subscribe([base+'/status',base+'/online']);});
+  client.on('reconnect',()=>setBroker(false,'আবার চেষ্টা...'));
+  client.on('close',()=>setBroker(false,'বিচ্ছিন্ন'));
+  client.on('error',e=>{$('msg').textContent='Error: '+e.message;});
+  client.on('message',(t,m)=>{
+    const s=m.toString();
+    if(t===base+'/online'){setDev(s==='1');return;}
+    if(t===base+'/status'){try{showStatus(JSON.parse(s));}catch(e){}}
+  });
+}
+$('save').onclick=()=>{save();connect();$('cfg').classList.remove('open');};
+setInterval(()=>{$('last').textContent=lastSeen?('শেষ আপডেট: '+Math.round((Date.now()-lastSeen)/1000)+' সে. আগে'):'শেষ আপডেট: --';},1000);
+
+applyUi();load();
+if($('base').value)connect();else $('cfg').classList.add('open');
+</script>
+</body>
+</html>
