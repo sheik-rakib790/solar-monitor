@@ -78,6 +78,10 @@ input:focus{border-color:var(--a1)}
 .chip.on{background:var(--a1);color:var(--on);border-color:var(--a1)}
 .row{display:flex;gap:8px;align-items:center;margin-top:6px}
 .row input{flex:1}
+.credit{margin-top:28px;padding-top:16px;border-top:1px solid var(--border);text-align:center;font-size:13px;color:var(--mute);line-height:1.8}
+.credit b{color:var(--a1);font-weight:600;margin-right:6px}
+.credit span.n{white-space:nowrap}
+.credit span.s{margin:0 8px;opacity:.5}
 @media (max-width:820px){.main{grid-template-columns:1fr}}
 @media (max-width:560px){.stats{grid-template-columns:1fr}canvas{height:170px}}
 </style>
@@ -128,6 +132,7 @@ input:focus{border-color:var(--a1)}
     <div id="msg"></div>
   </div>
 </div>
+<footer class="credit"><b>Developed by:</b><span class="n">Rakibul Islam</span><span class="s">|</span><span class="n">MD. Rakib Hossain Rasel</span><span class="s">|</span><span class="n">Joyanta Dey</span><span class="s">|</span><span class="n">Md. Shaharia Nishad</span><span class="s">|</span><span class="n">Md. Robiul Islam</span></footer>
 </div>
 <div class="sheet" id="sheet"><div class="sin">
   <h3 id="shT">Load</h3>
